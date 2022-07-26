@@ -1,0 +1,13 @@
+{
+    "role": {
+      "name": "Receiver"
+    },
+  
+    "preview": {
+      "instrumentation": {
+        "azureSdk": {
+          "enabled": true
+        }
+      }
+    }
+}
