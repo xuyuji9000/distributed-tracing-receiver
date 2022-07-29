@@ -1,0 +1,86 @@
+name: GitHub Actions Demo
+on: 
+  push:
+    branches:
+    - main
+jobs:
+  Explore-GitHub-Actions:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
+      - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
+      - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
+
+      - name: Check out repository code
+        uses: actions/checkout@v3
+
+      - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
+      - run: echo "🖥️ The workflow is now ready to test your code on the runner."
+
+      - name: List files in the repository
+        run: |
+          ls ${{ github.workspace }}
+
+      - run: echo "🍏 This job's status is ${{ job.status }}."
+
+      - uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 11
+
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+      
+      - name: Execute Gradle build
+        run: |
+          ./gradlew build
+
+          echo "list build result"
+          ls ./build/libs/
+
+      - name: Build and Push Container Image
+        run: |
+          docker --version
+          
+          echo "Building..."
+          docker build . -t docker.io/yogiman/distributed-tracing-receiver:${{ github.sha }}
+
+          docker login \
+          --username ${{ secrets.REGISTRY_USERNAME }} \
+          --password ${{ secrets.REGISTRY_PASSWORD }}
+
+          echo "Pushing..."
+          docker push docker.io/yogiman/distributed-tracing-receiver:${{ github.sha }}
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Azure CLI script
+        uses: azure/CLI@v1
+        with:
+          azcliversion: 2.38.0
+          inlineScript: |
+            az --version
+            az account list
+
+      # Set the target Azure Kubernetes Service (AKS) cluster. 
+      - uses: azure/aks-set-context@v1
+        with:
+          creds: '${{ secrets.AZURE_CREDENTIALS }}'
+          cluster-name: 'testkx'
+          resource-group: 'POC-Distributed-Tracing'
+
+      - name: List Kubernetes Context
+        run: |
+          kubectl config get-contexts
+
+      - uses: Azure/k8s-deploy@v4
+        with:
+          action: deploy
+          strategy: basic
+          manifests: |
+            k8s/service.yaml
+          images: |
+            docker.io/yogiman/distributed-tracing-receiver:${{ github.sha }}
